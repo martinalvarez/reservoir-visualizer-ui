@@ -3,7 +3,8 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 import { useReservoirData } from '../hooks/useReservoirData';
 import ErrorBoundary from './common/ErrorBoundary';
 
-const BASE_URL = 'http://localhost:5085/api/Reservoir';
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
+const BASE_URL = `${API_BASE}/Reservoir`;
 
 export const Dashboard = () => {
   const { points, stats, loading, error } = useReservoirData(BASE_URL);
