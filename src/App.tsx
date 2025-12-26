@@ -81,7 +81,7 @@ function App() {
               minHeight: '80%',
             }}
           >
-            {/* Renderizado Condicional */}
+            {/* Conditional Rendering */}
             {activeTab === 'dashboard' ? <Dashboard /> : <SimulationCanvas />}
           </div>
         </main>
