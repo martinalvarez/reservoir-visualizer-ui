@@ -1,6 +1,6 @@
+import { useState, useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { useReservoirData } from '../hooks/useReservoirData';
-// Import the ErrorBoundary from its new location
 import ErrorBoundary from './common/ErrorBoundary';
 
 const BASE_URL = 'http://localhost:5085/api/Reservoir';
@@ -8,18 +8,53 @@ const BASE_URL = 'http://localhost:5085/api/Reservoir';
 export const Dashboard = () => {
   const { points, stats, loading, error } = useReservoirData(BASE_URL);
 
-  if (loading) return <div style={{ padding: '20px' }}>Loading real-time telemetry...</div>;
+  // State for filtering the table and chart by layer name
+  const [searchTerm, setSearchTerm] = useState('');
 
+  /**
+   * Optimization 1: Memoized Filtering
+   * This logic only runs if 'points' or 'searchTerm' changes.
+   * Crucial for performance when dealing with large datasets.
+   */
+  const filteredPoints = useMemo(() => {
+    // We use a guard clause to return early if there are no points
+    if (!points) return [];
+
+    return points.filter((p) => p.layerName.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [points, searchTerm]);
+
+  /**
+   * Optimization 2: Memoized KPI Calculation
+   * Instead of calculating this in the render body, we memoize it.
+   */
+  const lastPoint = useMemo(() => {
+    return points.length > 0 ? points[points.length - 1] : null;
+  }, [points]);
+
+  if (loading) return <div style={{ padding: '20px' }}>Loading real-time telemetry...</div>;
   if (error) return <div style={{ padding: '20px', color: 'red' }}>{error}</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div>
-        <h1 style={{ marginTop: 0, marginBottom: '8px' }}>Operational Dashboard</h1>
-        <p style={{ color: '#16a34a', margin: 0, fontWeight: 'bold' }}>● Live from .NET Backend</p>
+      <div style={headerContainerStyle}>
+        <div>
+          <h1 style={{ marginTop: 0, marginBottom: '8px' }}>Operational Dashboard</h1>
+          <p style={{ color: '#16a34a', margin: 0, fontWeight: 'bold' }}>
+            ● Live from .NET Backend
+          </p>
+        </div>
+
+        {/* Search Input for Real-time Filtering */}
+        <input
+          type="text"
+          placeholder="Filter by formation / layer..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={searchInputStyle}
+        />
       </div>
 
-      {/* KPI Section - Usually safe, but can be wrapped if needed */}
+      {/* KPI Section */}
       <div style={kpiGridStyle}>
         <div style={kpiCardStyle}>
           <span style={kpiLabelStyle}>AVERAGE PRESSURE</span>
@@ -30,7 +65,7 @@ export const Dashboard = () => {
         <div style={kpiCardStyle}>
           <span style={kpiLabelStyle}>LAST TEMPERATURE</span>
           <div style={kpiValueStyle}>
-            {points[points.length - 1]?.temperature} <span style={unitStyle}>°C</span>
+            {lastPoint?.temperature ?? '--'} <span style={unitStyle}>°C</span>
           </div>
         </div>
         <div style={kpiCardStyle}>
@@ -39,16 +74,16 @@ export const Dashboard = () => {
         </div>
       </div>
 
-      {/* Chart Section - Protected with a custom fallback */}
+      {/* Chart Section - Now using filteredPoints */}
       <ErrorBoundary
         fallback={
           <div style={chartWrapperStyle}>Chart visualization is currently unavailable.</div>
         }
       >
         <div style={chartWrapperStyle}>
-          <h3 style={chartTitleStyle}>Pressure Trend (from JSON)</h3>
+          <h3 style={chartTitleStyle}>Pressure Trend (Filtered View)</h3>
           <ResponsiveContainer width="100%" height="85%">
-            <AreaChart data={points}>
+            <AreaChart data={filteredPoints}>
               <XAxis dataKey="id" />
               <YAxis domain={['auto', 'auto']} />
               <Tooltip
@@ -69,7 +104,7 @@ export const Dashboard = () => {
         </div>
       </ErrorBoundary>
 
-      {/* Table Section - Protected with default ErrorBoundary UI */}
+      {/* Table Section - Now using filteredPoints */}
       <ErrorBoundary>
         <div style={{ marginTop: '20px', overflowX: 'auto' }}>
           <table style={tableStyle}>
@@ -81,13 +116,23 @@ export const Dashboard = () => {
               </tr>
             </thead>
             <tbody>
-              {points.map((p) => (
+              {filteredPoints.map((p) => (
                 <tr key={p.id} style={tableRowStyle}>
                   <td style={tableCellStyle}>{p.id}</td>
                   <td style={tableCellStyle}>{p.layerName}</td>
                   <td style={{ ...tableCellStyle, fontWeight: 'bold' }}>{p.pressure} PSI</td>
                 </tr>
               ))}
+              {filteredPoints.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={3}
+                    style={{ padding: '20px', textAlign: 'center', color: '#71717a' }}
+                  >
+                    No points match your search criteria.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -96,7 +141,26 @@ export const Dashboard = () => {
   );
 };
 
-// Styles remain the same below...
+// --- Styles Objects ---
+
+const headerContainerStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  flexWrap: 'wrap' as const,
+  gap: '16px',
+};
+
+const searchInputStyle = {
+  padding: '10px 14px',
+  borderRadius: '6px',
+  border: '1px solid #e4e4e7',
+  fontSize: '14px',
+  width: '100%',
+  maxWidth: '300px',
+  outline: 'none',
+};
+
 const kpiGridStyle = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
